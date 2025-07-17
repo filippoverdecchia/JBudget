@@ -1,0 +1,50 @@
+plugins {
+    id 'application'
+}
+
+repositories {
+    mavenCentral()
+}
+
+def javafxVersion = "21.0.7"
+def platform = "win"
+
+dependencies {
+    implementation "org.openjfx:javafx-base:$javafxVersion:$platform"
+    implementation "org.openjfx:javafx-graphics:$javafxVersion:$platform"
+    implementation "org.openjfx:javafx-controls:$javafxVersion:$platform"
+    implementation "org.openjfx:javafx-fxml:$javafxVersion:$platform"
+
+    // Jackson (già incluso prima)
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.0'
+}
+
+
+application {
+    mainClass = 'it.unicam.cs.mpgc.jbudget119474.gui.MainFX'
+}
+
+def javafxModules = ['javafx.base', 'javafx.graphics', 'javafx.controls', 'javafx.fxml']
+
+def getJavaFXModulePath() {
+    return "C:/javafx-sdk-21.0.7/lib"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += [
+            '--module-path', getJavaFXModulePath(),
+            '--add-modules', javafxModules.join(',')
+    ]
+}
+
+tasks.withType(JavaExec).configureEach {
+    jvmArgs += [
+        "--module-path", getJavaFXModulePath(),
+        "--add-modules", javafxModules.join(',')
+    ]
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}

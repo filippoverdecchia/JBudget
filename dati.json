@@ -1,0 +1,59 @@
+{
+  "movimenti" : [ {
+    "data" : [ 2025, 7, 17 ],
+    "descrizione" : "CAgotto",
+    "importo" : 57.0,
+    "tag" : [ {
+      "name" : "Casa"
+    } ]
+  }, {
+    "data" : [ 2025, 7, 17 ],
+    "descrizione" : "Gay",
+    "importo" : -25.0,
+    "tag" : [ {
+      "name" : "Casa"
+    } ]
+  }, {
+    "data" : [ 2025, 7, 17 ],
+    "descrizione" : "Lesbica",
+    "importo" : 89.0,
+    "tag" : [ {
+      "name" : "Casa"
+    } ]
+  }, {
+    "data" : [ 2025, 7, 17 ],
+    "descrizione" : "Barbarp",
+    "importo" : 98.0,
+    "tag" : [ {
+      "name" : "Scuola"
+    } ]
+  }, {
+    "data" : [ 2025, 7, 17 ],
+    "descrizione" : "Frocio",
+    "importo" : -16.0,
+    "tag" : [ {
+      "name" : "Scuola"
+    } ]
+  }, {
+    "data" : [ 2025, 7, 10 ],
+    "descrizione" : "Gaaaay",
+    "importo" : 78.0,
+    "tag" : [ {
+      "name" : "Casa"
+    } ]
+  }, {
+    "data" : [ 2025, 7, 16 ],
+    "descrizione" : "GAAAAAAY",
+    "importo" : 85.0,
+    "tag" : [ {
+      "name" : "Casa"
+    } ]
+  } ],
+  "tagTree" : [ {
+    "parent" : "root",
+    "child" : "Casa"
+  }, {
+    "parent" : "root",
+    "child" : "Scuola"
+  } ]
+}
