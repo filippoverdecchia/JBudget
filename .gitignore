@@ -16,3 +16,8 @@ dati.json
 
 # Logs
 *.log
+
+# IDE extra
+.vscode/
+bin/
+output.txt
