@@ -15,250 +15,374 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.time.LocalDate;
-import java.util.*;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class JBudgetView extends VBox {
 
-    private final TableView<Movement> tabella = new TableView<>();
-    private final MovementRepository archivioMovimenti = new MovementRepositoryImpl();
-    private final PersistenceManager salvataggio = new JsonPersistence();
-    private final TagTree alberoTag = new TagTreeImpl("root");
+    private final TableView<Movement> table = new TableView<>();
+    private final MovementRepository movementRepository = new MovementRepositoryImpl();
+    private final PersistenceManager persistenceManager = new JsonPersistence();
+    private final TagTree tagTree = new TagTreeImpl("root");
+
+    private final javafx.collections.ObservableList<Movement> tableData =
+            FXCollections.observableArrayList();
 
     public JBudgetView() {
+
         setSpacing(10);
         setPadding(new Insets(10));
 
-        tabella.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
 
-        TableColumn<Movement, String> colData = new TableColumn<>("Data");
-        colData.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getData().toString()));
+        TableColumn<Movement, String> dateColumn = new TableColumn<>("Data");
+        dateColumn.setCellValueFactory(cell ->
+                new SimpleStringProperty(cell.getValue().getDate().toString()));
 
-        TableColumn<Movement, String> colDescrizione = new TableColumn<>("Descrizione");
-        colDescrizione.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getDescrizione()));
+        TableColumn<Movement, String> descriptionColumn = new TableColumn<>("Descrizione");
+        descriptionColumn.setCellValueFactory(cell ->
+                new SimpleStringProperty(cell.getValue().getDescription()));
 
-        TableColumn<Movement, String> colImporto = new TableColumn<>("Importo");
-        colImporto.setCellValueFactory(cell -> new SimpleStringProperty(String.format("%.2f €", cell.getValue().getImporto())));
+        TableColumn<Movement, String> amountColumn = new TableColumn<>("Importo");
+        amountColumn.setCellValueFactory(cell ->
+                new SimpleStringProperty(String.format("%.2f €", cell.getValue().getAmount())));
 
-        TableColumn<Movement, String> colTag = new TableColumn<>("Tag");
-        colTag.setCellValueFactory(cellData -> {
-            List<Tag> tags = cellData.getValue().getTag();
-            String nomeTag = tags != null && !tags.isEmpty() ? tags.get(0).getName() : "";
-            return new SimpleStringProperty(nomeTag);
+        TableColumn<Movement, String> tagColumn = new TableColumn<>("Tag");
+        tagColumn.setCellValueFactory(cell -> {
+            String tagsText = cell.getValue().getTags().stream()
+                    .map(Tag::getName)
+                    .collect(Collectors.joining(", "));
+            return new SimpleStringProperty(tagsText);
         });
-        tabella.getColumns().add(colTag);
 
+        table.getColumns().setAll(dateColumn, descriptionColumn, amountColumn, tagColumn);
 
+        table.setItems(tableData);
+        getChildren().add(table);
 
-        tabella.getColumns().addAll(colData, colDescrizione, colImporto);
-        getChildren().add(tabella);
+        Button addButton = new Button("Aggiungi");
+        Button saveButton = new Button("Salva");
+        Button loadButton = new Button("Carica");
+        Button totalButton = new Button("Totale");
+        Button tagButton = new Button("Per Tag");
+        Button scheduleButton = new Button("Scadenzario");
+        Button statsButton = new Button("Statistiche");
 
-        // Bottoni
-        Button btnAggiungi = new Button("Aggiungi");
-        Button btnSalva = new Button("Salva");
-        Button btnCarica = new Button("Carica");
-        Button btnTotale = new Button("Totale");
-        Button btnPerTag = new Button("Per Tag");
-        Button btnScadenzario = new Button("Scadenzario");
-        Button btnStatistiche = new Button("Statistiche");
+        TextField tagField = new TextField();
+        tagField.setPromptText("Inserisci tag");
 
-        TextField campoTag = new TextField();
-        campoTag.setPromptText("Inserisci tag");
+        HBox buttonBar = new HBox(10);
+        buttonBar.setPadding(new Insets(10));
 
-        HBox barraBottoni = new HBox(10);
-        barraBottoni.setPadding(new Insets(10));
-        List<Button> pulsanti = List.of(btnAggiungi, btnSalva, btnCarica, btnTotale, btnPerTag, btnScadenzario, btnStatistiche);
-        pulsanti.forEach(b -> b.setPrefWidth(110));
-        campoTag.setPrefWidth(140);
-        barraBottoni.getChildren().addAll(btnAggiungi, btnSalva, btnCarica, btnTotale, campoTag, btnPerTag, btnScadenzario, btnStatistiche);
-        getChildren().add(barraBottoni);
-
-        // Eventi
-        btnAggiungi.setOnAction(e -> mostraDialogoAggiunta());
-        btnSalva.setOnAction(e -> {
-            try {
-                salvataggio.salva(archivioMovimenti, alberoTag, "dati.json");
-                mostraInfo("Dati salvati correttamente.");
-            } catch (Exception ex) {
-                mostraErrore("Errore nel salvataggio: " + ex.getMessage());
-            }
-        });
-        btnCarica.setOnAction(e -> {
-            try {
-                salvataggio.carica("dati.json", archivioMovimenti, alberoTag);
-                aggiornaTabella();
-                mostraInfo("Dati caricati correttamente.");
-            } catch (Exception ex) {
-                mostraErrore("Errore nel caricamento: " + ex.getMessage());
-            }
-        });
-        btnTotale.setOnAction(e -> {
-            double totale = archivioMovimenti.getTotalBalance();
-            mostraInfo("Bilancio totale: " + String.format("%.2f €", totale));
-        });
-        btnPerTag.setOnAction(e -> {
-            String nomeTag = campoTag.getText().trim();
-            if (nomeTag.isEmpty()) {
-                mostraErrore("Inserisci un nome di tag.");
-                return;
-            }
-            Tag t = alberoTag.getOrCreateTag(nomeTag);
-            double parziale = archivioMovimenti.getBalanceForTag(t, alberoTag);
-            mostraInfo("Bilancio per il tag '" + nomeTag + "': " + String.format("%.2f €", parziale));
-        });
-        btnScadenzario.setOnAction(e -> mostraScadenzario());
-        btnStatistiche.setOnAction(e -> mostraStatistiche());
-
-        aggiornaTabella();
-    }
-
-    private void mostraDialogoAggiunta() {
-        Stage finestra = new Stage();
-        finestra.initModality(Modality.APPLICATION_MODAL);
-        finestra.setTitle("Aggiungi Movimento");
-
-        VBox contenuto = new VBox(10);
-        contenuto.setPadding(new Insets(15));
-
-        DatePicker selettoreData = new DatePicker(LocalDate.now());
-        TextField campoDesc = new TextField();
-        TextField campoImporto = new TextField();
-        TextField campoTags = new TextField();
-        CheckBox chkProgrammato = new CheckBox("Movimento programmato");
-
-        contenuto.getChildren().addAll(
-                new Label("Data:"), selettoreData,
-                new Label("Descrizione:"), campoDesc,
-                new Label("Importo (+ entrata, - uscita):"), campoImporto,
-                new Label("Tag (separati da virgola):"), campoTags,
-                chkProgrammato
+        List<Button> buttons = List.of(
+                addButton,
+                saveButton,
+                loadButton,
+                totalButton,
+                tagButton,
+                scheduleButton,
+                statsButton
         );
 
-        Button conferma = new Button("Conferma");
-        conferma.setOnAction(e -> {
+        buttons.forEach(b -> b.setPrefWidth(110));
+        tagField.setPrefWidth(140);
+
+        buttonBar.getChildren().addAll(
+                addButton,
+                saveButton,
+                loadButton,
+                totalButton,
+                tagField,
+                tagButton,
+                scheduleButton,
+                statsButton
+        );
+
+        getChildren().add(buttonBar);
+
+        addButton.setOnAction(e -> showAddDialog());
+
+        saveButton.setOnAction(e -> {
             try {
-                if (campoDesc.getText().isBlank() || campoImporto.getText().isBlank()) {
-                    mostraErrore("Inserisci descrizione e importo.");
+                persistenceManager.save(movementRepository, tagTree, "dati.json");
+                showInfo("Dati salvati correttamente.");
+            } catch (Exception ex) {
+                showError("Errore nel salvataggio: " + ex.getMessage());
+            }
+        });
+
+        loadButton.setOnAction(e -> {
+            try {
+                persistenceManager.load("dati.json", movementRepository, tagTree);
+                refreshTable();
+                showInfo("Dati caricati correttamente.");
+            } catch (Exception ex) {
+                showError("Errore nel caricamento: " + ex.getMessage());
+            }
+        });
+
+        totalButton.setOnAction(e -> {
+            refreshTable();
+            double total = movementRepository.getTotalBalance();
+            showInfo("Bilancio totale: " + String.format("%.2f €", total));
+        });
+
+        tagButton.setOnAction(e -> {
+            refreshTable();
+
+            String tagName = tagField.getText().trim();
+            if (tagName.isEmpty()) {
+                showError("Inserisci un nome di tag.");
+                return;
+            }
+
+            Tag tag = tagTree.getOrCreateTag(tagName);
+            double partial = movementRepository.getBalanceForTag(tag, tagTree);
+
+            showInfo("Bilancio per il tag '" + tagName + "': " + String.format("%.2f €", partial));
+        });
+
+        scheduleButton.setOnAction(e -> showSchedule());
+        statsButton.setOnAction(e -> showStatistics());
+
+        refreshTable();
+    }
+
+    private void showAddDialog() {
+
+        Stage stage = new Stage();
+        stage.initModality(Modality.APPLICATION_MODAL);
+        stage.setTitle("Aggiungi Movimento");
+
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(15));
+
+        DatePicker datePicker = new DatePicker(LocalDate.now());
+        TextField descriptionField = new TextField();
+        TextField amountField = new TextField();
+        TextField tagsField = new TextField();
+
+        CheckBox scheduledCheckBox = new CheckBox("Movimento programmato");
+
+        TextField monthsField = new TextField();
+        monthsField.setPromptText("Numero mesi (es. 12)");
+        monthsField.setDisable(true);
+
+        scheduledCheckBox.selectedProperty().addListener((obs, o, n) -> {
+            monthsField.setDisable(!n);
+            if (!n) {
+                monthsField.clear();
+            }
+        });
+
+        content.getChildren().addAll(
+                new Label("Data:"), datePicker,
+                new Label("Descrizione:"), descriptionField,
+                new Label("Importo (+ entrata, - uscita):"), amountField,
+                new Label("Tag (separati da virgola):"), tagsField,
+                scheduledCheckBox,
+                new Label("Numero mesi:"), monthsField
+        );
+
+        Button confirmButton = new Button("Conferma");
+
+        confirmButton.setOnAction(e -> {
+            try {
+
+                if (descriptionField.getText().isBlank()
+                        || amountField.getText().isBlank()) {
+                    showError("Inserisci descrizione e importo.");
                     return;
                 }
 
-                LocalDate data = selettoreData.getValue();
-                String descrizione = campoDesc.getText();
-                double importo = Double.parseDouble(campoImporto.getText());
-                String[] tagInseriti = campoTags.getText().split(",");
+                LocalDate date = datePicker.getValue();
+                String description = descriptionField.getText();
+                double amount = Double.parseDouble(amountField.getText());
 
-                Movement movimento = new Movement(data, descrizione, importo);
-                for (String tag : tagInseriti) {
-                    if (!tag.isBlank()) {
-                        movimento.aggiungiTag(alberoTag.getOrCreateTag(tag.trim()));
+                String[] insertedTags = tagsField.getText().split(",");
+
+                Movement movement = new Movement(date, description, amount);
+
+                for (String t : insertedTags) {
+                    if (!t.isBlank()) {
+                        movement.addTag(tagTree.getOrCreateTag(t.trim()));
                     }
                 }
 
-                if (chkProgrammato.isSelected()) {
-                    RatePlan piano = new RatePlan(data, 1, -importo, descrizione);
-                    archivioMovimenti.addScheduled(piano.getListaRate().get(0));
+                if (scheduledCheckBox.isSelected()) {
+
+                    if (monthsField.getText().isBlank()) {
+                        showError("Inserisci il numero di mesi.");
+                        return;
+                    }
+
+                    int months;
+
+                    try {
+                        months = Integer.parseInt(monthsField.getText().trim());
+
+                        if (months <= 0) {
+                            showError("Il numero di mesi deve essere maggiore di 0.");
+                            return;
+                        }
+
+                    } catch (NumberFormatException ex) {
+                        showError("Numero mesi non valido.");
+                        return;
+                    }
+
+                    RatePlan plan = new RatePlan(date, months, amount, description);
+
+                    for (ScheduledMovement sm : plan.getInstallments()) {
+                        Movement base = sm.getBaseMovement();
+                        if (base != null) {
+                            for (Tag tag : movement.getTags()) {
+                                base.addTag(tag);
+                            }
+                        }
+                        movementRepository.addScheduled(sm);
+                    }
+
                 } else {
-                    archivioMovimenti.add(movimento);
+                    movementRepository.add(movement);
                 }
 
-                aggiornaTabella();
-                finestra.close();
+                refreshTable();
+                stage.close();
+
             } catch (NumberFormatException ex) {
-                mostraErrore("Importo non valido.");
+                showError("Importo non valido.");
             } catch (Exception ex) {
-                mostraErrore("Errore: " + ex.getMessage());
+                showError("Errore: " + ex.getMessage());
             }
         });
 
-        contenuto.getChildren().add(conferma);
-        finestra.setScene(new Scene(contenuto, 420, 420));
-        finestra.showAndWait();
+        content.getChildren().add(confirmButton);
+
+        stage.setScene(new Scene(content, 420, 420));
+        stage.showAndWait();
     }
 
-    private void mostraScadenzario() {
-        Stage finestra = new Stage();
-        finestra.initModality(Modality.APPLICATION_MODAL);
-        finestra.setTitle("Scadenzario");
+    private void showSchedule() {
 
-        VBox contenuto = new VBox(10);
-        contenuto.setPadding(new Insets(10));
+        Stage stage = new Stage();
+        stage.initModality(Modality.APPLICATION_MODAL);
+        stage.setTitle("Scadenzario");
 
-        TableView<ScheduledMovement> tabellaSchedulati = new TableView<>();
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(10));
 
-        TableColumn<ScheduledMovement, String> colData = new TableColumn<>("Data");
-        colData.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getDate().toString()));
+        TableView<ScheduledMovement> scheduleTable = new TableView<>();
 
-        TableColumn<ScheduledMovement, String> colDescrizione = new TableColumn<>("Descrizione");
-        colDescrizione.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getOriginal().getDescrizione()));
+        TableColumn<ScheduledMovement, String> dateColumn = new TableColumn<>("Data");
+        dateColumn.setCellValueFactory(cell ->
+                new SimpleStringProperty(cell.getValue().getDate() == null ? "" : cell.getValue().getDate().toString()));
 
-        TableColumn<ScheduledMovement, String> colImporto = new TableColumn<>("Importo");
-        colImporto.setCellValueFactory(cell -> new SimpleStringProperty(
-                String.format("%.2f €", cell.getValue().getOriginal().getImporto()))
-        );
+        TableColumn<ScheduledMovement, String> descriptionColumn = new TableColumn<>("Descrizione");
+        descriptionColumn.setCellValueFactory(cell -> {
+            Movement base = cell.getValue().getBaseMovement();
+            return new SimpleStringProperty(base == null ? "" : base.getDescription());
+        });
 
-        tabellaSchedulati.getColumns().addAll(colData, colDescrizione, colImporto);
+        TableColumn<ScheduledMovement, String> amountColumn = new TableColumn<>("Importo");
+        amountColumn.setCellValueFactory(cell -> {
+            Movement base = cell.getValue().getBaseMovement();
+            double amount = base == null ? 0.0 : base.getAmount();
+            return new SimpleStringProperty(String.format("%.2f €", amount));
+        });
 
-        List<ScheduledMovement> prossimi = archivioMovimenti.getScheduled().stream()
-                .sorted(Comparator.comparing(ScheduledMovement::getDate))
+        TableColumn<ScheduledMovement, String> tagColumn = new TableColumn<>("Tag");
+        tagColumn.setCellValueFactory(cell -> {
+            Movement base = cell.getValue().getBaseMovement();
+            String tagsText = base == null ? "" : base.getTags().stream()
+                    .map(Tag::getName)
+                    .collect(Collectors.joining(", "));
+            return new SimpleStringProperty(tagsText);
+        });
+
+        scheduleTable.getColumns().setAll(dateColumn, descriptionColumn, amountColumn, tagColumn);
+
+        List<ScheduledMovement> upcoming = movementRepository.getScheduled().stream()
+                .sorted(Comparator.comparing(ScheduledMovement::getDate, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
 
-        tabellaSchedulati.setItems(FXCollections.observableArrayList(prossimi));
-        contenuto.getChildren().add(tabellaSchedulati);
-        finestra.setScene(new Scene(contenuto, 500, 300));
-        finestra.showAndWait();
+        scheduleTable.setItems(FXCollections.observableArrayList(upcoming));
+
+        content.getChildren().add(scheduleTable);
+
+        stage.setScene(new Scene(content, 650, 320));
+        stage.showAndWait();
     }
 
-    private void mostraStatistiche() {
-        Stage finestra = new Stage();
-        finestra.initModality(Modality.APPLICATION_MODAL);
-        finestra.setTitle("Statistiche");
+    private void showStatistics() {
 
-        VBox contenuto = new VBox(10);
-        contenuto.setPadding(new Insets(10));
+        Stage stage = new Stage();
+        stage.initModality(Modality.APPLICATION_MODAL);
+        stage.setTitle("Statistiche");
 
-        DatePicker da1 = new DatePicker();
-        DatePicker a1 = new DatePicker();
-        DatePicker da2 = new DatePicker();
-        DatePicker a2 = new DatePicker();
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(10));
 
-        contenuto.getChildren().addAll(
-                new Label("Periodo 1 - Da:"), da1, new Label("A:"), a1,
-                new Label("Periodo 2 - Da:"), da2, new Label("A:"), a2
+        DatePicker start1 = new DatePicker();
+        DatePicker end1 = new DatePicker();
+        DatePicker start2 = new DatePicker();
+        DatePicker end2 = new DatePicker();
+
+        content.getChildren().addAll(
+                new Label("Periodo 1 - Da:"), start1,
+                new Label("A:"), end1,
+                new Label("Periodo 2 - Da:"), start2,
+                new Label("A:"), end2
         );
 
-        Button confronta = new Button("Confronta");
-        confronta.setOnAction(e -> {
+        Button compareButton = new Button("Confronta");
+
+        compareButton.setOnAction(e -> {
             try {
-                StatisticsService servizio = new StatisticsService(archivioMovimenti.getAll(), alberoTag);
-                Map<String, Double> confronto = servizio.confrontaPeriodi(
-                        da1.getValue(), a1.getValue(),
-                        da2.getValue(), a2.getValue(),
-                        alberoTag
+
+                StatisticsService service = new StatisticsService(movementRepository.getAll());
+
+                Map<String, Double> comparison = service.comparePeriods(
+                        start1.getValue(), end1.getValue(),
+                        start2.getValue(), end2.getValue()
                 );
 
                 StringBuilder sb = new StringBuilder();
-                confronto.forEach((nome, valore) -> sb.append(nome).append(": ").append(String.format("%.2f €", valore)).append("\n"));
 
-                mostraInfo(sb.toString());
-                finestra.close();
+                comparison.forEach((k, v) ->
+                        sb.append(k)
+                                .append(": ")
+                                .append(String.format("%.2f €", v))
+                                .append("\n")
+                );
+
+                showInfo(sb.toString());
+                stage.close();
+
             } catch (Exception ex) {
-                mostraErrore("Errore nel confronto: " + ex.getMessage());
+                showError("Errore nel confronto: " + ex.getMessage());
             }
         });
 
-        contenuto.getChildren().add(confronta);
-        finestra.setScene(new Scene(contenuto, 400, 400));
-        finestra.showAndWait();
+        content.getChildren().add(compareButton);
+
+        stage.setScene(new Scene(content, 400, 400));
+        stage.showAndWait();
     }
 
-    private void mostraErrore(String messaggio) {
-        new Alert(Alert.AlertType.ERROR, messaggio).show();
+    private void showError(String message) {
+        new Alert(Alert.AlertType.ERROR, message).show();
     }
 
-    private void mostraInfo(String messaggio) {
-        new Alert(Alert.AlertType.INFORMATION, messaggio).show();
+    private void showInfo(String message) {
+        new Alert(Alert.AlertType.INFORMATION, message).show();
     }
 
-    private void aggiornaTabella() {
-        tabella.setItems(FXCollections.observableArrayList(archivioMovimenti.getAll()));
+    private void refreshTable() {
+        movementRepository.applyScheduledMovements(LocalDate.now());
+        tableData.setAll(movementRepository.getAll());
+        table.refresh();
     }
 }

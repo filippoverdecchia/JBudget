@@ -1,0 +1,18 @@
+﻿# IntelliJ / IDE
+.idea/
+*.iml
+out/
+
+# Gradle
+.gradle/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# App data
+dati.json
+
+# Logs
+*.log

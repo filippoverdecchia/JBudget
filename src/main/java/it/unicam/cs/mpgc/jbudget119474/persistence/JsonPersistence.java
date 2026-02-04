@@ -11,7 +11,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
-public class JsonPersistence implements PersistenceManager{
+public class JsonPersistence implements PersistenceManager {
 
     private final ObjectMapper mapper;
 
@@ -20,59 +20,102 @@ public class JsonPersistence implements PersistenceManager{
         mapper.registerModule(new JavaTimeModule());
     }
 
-    public void salva(MovementRepository repoMovimenti, TagTree alberoTag, String nomeFile) throws IOException {
-        ObjectNode nodoRadice = mapper.createObjectNode();
+    public void save(MovementRepository movementRepository,
+                     TagTree tagTree,
+                     String fileName) throws IOException {
 
-        // Salva la lista dei movimenti
-        nodoRadice.putPOJO("movimenti", repoMovimenti.getAll());
+        ObjectNode rootNode = mapper.createObjectNode();
 
-        // Costruisce la gerarchia dei tag come lista di mappe
-        List<Map<String, String>> gerarchiaTag = new ArrayList<>();
-        for (Tag figlio : alberoTag.getChildren(alberoTag.getRoot())) {
-            aggiungiGerarchia(gerarchiaTag, alberoTag, alberoTag.getRoot(), figlio);
+        rootNode.putPOJO("movimenti", movementRepository.getAll());
+        rootNode.putPOJO("schedulati", movementRepository.getScheduled());
+
+        List<Map<String, String>> tagHierarchy = new ArrayList<>();
+        for (Tag child : tagTree.getChildren(tagTree.getRoot())) {
+            addHierarchy(tagHierarchy, tagTree, tagTree.getRoot(), child);
         }
-        nodoRadice.putPOJO("tagTree", gerarchiaTag);
 
-        mapper.writerWithDefaultPrettyPrinter().writeValue(new File(nomeFile), nodoRadice);
+        rootNode.putPOJO("tagTree", tagHierarchy);
+
+        mapper.writerWithDefaultPrettyPrinter()
+                .writeValue(new File(fileName), rootNode);
     }
 
-    public void carica(String nomeFile, MovementRepository repo, TagTree alberoTag) throws IOException {
-        ObjectNode nodoRadice = (ObjectNode) mapper.readTree(new File(nomeFile));
+    public void load(String fileName,
+                     MovementRepository repository,
+                     TagTree tagTree) throws IOException {
 
-        List<Movement> listaMovimenti = mapper.convertValue(nodoRadice.get("movimenti"), new TypeReference<>() {});
-        List<Map<String, String>> gerarchiaTag = mapper.convertValue(nodoRadice.get("tagTree"), new TypeReference<>() {});
+        ObjectNode rootNode =
+                (ObjectNode) mapper.readTree(new File(fileName));
 
-        // Aggiunge i movimenti
-        repo.setAll(listaMovimenti);
+        List<Movement> movements =
+                rootNode.hasNonNull("movimenti")
+                        ? mapper.convertValue(
+                                rootNode.get("movimenti"),
+                                new TypeReference<List<Movement>>() {})
+                        : new ArrayList<>();
 
-        // Ricostruisce la gerarchia
-        for (Map<String, String> mappa : gerarchiaTag) {
-            Tag padre = new Tag(mappa.get("parent"));
-            Tag figlio = new Tag(mappa.get("child"));
-            alberoTag.addSubTag(padre, figlio);
+        List<ScheduledMovement> scheduled =
+                rootNode.hasNonNull("schedulati")
+                        ? mapper.convertValue(
+                                rootNode.get("schedulati"),
+                                new TypeReference<List<ScheduledMovement>>() {})
+                        : new ArrayList<>();
+
+        List<Map<String, String>> tagHierarchy =
+                rootNode.hasNonNull("tagTree")
+                        ? mapper.convertValue(
+                                rootNode.get("tagTree"),
+                                new TypeReference<List<Map<String, String>>>() {})
+                        : new ArrayList<>();
+
+        repository.setAll(movements);
+
+        for (Map<String, String> map : tagHierarchy) {
+            Tag parent = new Tag(map.get("parent"));
+            Tag child = new Tag(map.get("child"));
+            tagTree.addSubTag(parent, child);
         }
 
-        // Ricollega i tag ai movimenti usando quelli dell'albero
-        for (Movement mov : listaMovimenti) {
-            Set<Tag> tagAggiornati = new HashSet<>();
-            for (Tag t : mov.getTag()) {
-                tagAggiornati.add(alberoTag.getOrCreateTag(t.getName()));
+        for (Movement movement : movements) {
+            realignTags(movement, tagTree);
+        }
+
+        for (ScheduledMovement sm : scheduled) {
+            Movement base = sm.getBaseMovement();
+            if (base != null) {
+                realignTags(base, tagTree);
             }
-            mov.clearTag();
-            for (Tag t : tagAggiornati) {
-                mov.aggiungiTag(t);
-            }
+            repository.addScheduled(sm);
         }
     }
 
-    private void aggiungiGerarchia(List<Map<String, String>> lista, TagTree albero, Tag padre, Tag figlio) {
-        Map<String, String> coppia = new HashMap<>();
-        coppia.put("parent", padre.getName());
-        coppia.put("child", figlio.getName());
-        lista.add(coppia);
+    private void addHierarchy(List<Map<String, String>> list,
+                              TagTree tree,
+                              Tag parent,
+                              Tag child) {
 
-        for (Tag sotto : albero.getChildren(figlio)) {
-            aggiungiGerarchia(lista, albero, figlio, sotto);
+        Map<String, String> pair = new HashMap<>();
+        pair.put("parent", parent.getName());
+        pair.put("child", child.getName());
+        list.add(pair);
+
+        for (Tag sub : tree.getChildren(child)) {
+            addHierarchy(list, tree, child, sub);
+        }
+    }
+
+    private void realignTags(Movement movement, TagTree tagTree) {
+
+        Set<Tag> newTags = new HashSet<>();
+
+        for (Tag t : movement.getTags()) {
+            newTags.add(tagTree.getOrCreateTag(t.getName()));
+        }
+
+        movement.clearTags();
+
+        for (Tag t : newTags) {
+            movement.addTag(t);
         }
     }
 }

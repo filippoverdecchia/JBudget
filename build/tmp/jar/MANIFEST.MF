@@ -1,3 +1,0 @@
-Manifest-Version: 1.0
-Main-Class: it.unicam.cs.mpgc.jbudget119474.Main
-

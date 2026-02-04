@@ -5,84 +5,80 @@ import it.unicam.cs.mpgc.jbudget119474.model.*;
 import java.time.LocalDate;
 import java.util.*;
 
-/**
- * Implementazione semplice di un repository di movimenti e movimenti pianificati.
- */
 public class MovementRepositoryImpl implements MovementRepository {
 
-    private final List<Movement> listaMovimenti = new ArrayList<>();
-    private final List<ScheduledMovement> listaSchedulati = new ArrayList<>();
+    private final List<Movement> movements = new ArrayList<>();
+    private final List<ScheduledMovement> scheduledMovements = new ArrayList<>();
 
     @Override
-    public void add(Movement movimento) {
-        listaMovimenti.add(movimento);
+    public void add(Movement movement) {
+        movements.add(movement);
     }
 
     @Override
-    public void addAll(List<Movement> movimenti) {
-        listaMovimenti.addAll(movimenti);
+    public void addAll(List<Movement> movements) {
+        this.movements.addAll(movements);
     }
 
     @Override
-    public void setAll(List<Movement> movimenti) {
+    public void setAll(List<Movement> movements) {
         clear();
-        listaMovimenti.addAll(movimenti);
+        this.movements.addAll(movements);
     }
 
     @Override
     public void clear() {
-        listaMovimenti.clear();
-        listaSchedulati.clear();
+        movements.clear();
+        scheduledMovements.clear();
     }
 
     @Override
     public List<Movement> getAll() {
-        applicaSchedulati();
-        return new ArrayList<>(listaMovimenti);
+        return new ArrayList<>(movements);
     }
 
     @Override
     public double getTotalBalance() {
-        return listaMovimenti.stream()
-                .mapToDouble(Movement::getImporto)
+        return movements.stream()
+                .mapToDouble(Movement::getAmount)
                 .sum();
     }
 
     @Override
-    public double getBalanceForTag(Tag tag, TagTree alberoTag) {
-        Set<Tag> tagValidi = alberoTag.getAllSubTagsIncluding(tag);
-        return listaMovimenti.stream()
-                .filter(m -> m.getTag().stream().anyMatch(tagValidi::contains))
-                .mapToDouble(Movement::getImporto)
+    public double getBalanceForTag(Tag tag, TagTree tagTree) {
+        Set<Tag> validTags = tagTree.getAllSubTagsIncluding(tag);
+
+        return movements.stream()
+                .filter(m -> m.getTags().stream().anyMatch(validTags::contains))
+                .mapToDouble(Movement::getAmount)
                 .sum();
     }
 
     @Override
-    public void addScheduled(ScheduledMovement schedulato) {
-        listaSchedulati.add(schedulato);
+    public void addScheduled(ScheduledMovement scheduled) {
+        scheduledMovements.add(scheduled);
     }
 
     @Override
     public List<ScheduledMovement> getScheduled() {
-        return new ArrayList<>(listaSchedulati);
+        return new ArrayList<>(scheduledMovements);
     }
 
-    private void applicaSchedulati() {
-        Iterator<ScheduledMovement> iteratore = listaSchedulati.iterator();
-        List<ScheduledMovement> daAggiungere = new ArrayList<>();
+    @Override
+    public void applyScheduledMovements(LocalDate today) {
+        Iterator<ScheduledMovement> iterator = scheduledMovements.iterator();
 
-        while (iteratore.hasNext()) {
-            ScheduledMovement sm = iteratore.next();
-            if (!sm.getDate().isAfter(LocalDate.now())) {
-                listaMovimenti.add(sm.toMovement());
-                ScheduledMovement prossimo = sm.next();
-                if (prossimo != null) {
-                    daAggiungere.add(prossimo);
+        while (iterator.hasNext()) {
+            ScheduledMovement sm = iterator.next();
+
+            LocalDate date = sm.getDate();
+            if (date != null && !date.isAfter(today)) {
+                Movement concrete = sm.toConcreteMovement();
+                if (concrete != null) {
+                    movements.add(concrete);
                 }
-                iteratore.remove();
+                iterator.remove();
             }
         }
-
-        listaSchedulati.addAll(daAggiungere);
     }
 }

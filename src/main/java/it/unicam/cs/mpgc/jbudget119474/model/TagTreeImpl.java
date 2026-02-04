@@ -4,87 +4,98 @@ import java.util.*;
 
 public class TagTreeImpl implements TagTree {
 
-    private final Map<Tag, Tag> mappaPadri;
-    private final Map<Tag, List<Tag>> mappaFigli;
-    private final Tag radice;
+    private final Map<Tag, Tag> parentMap;
+    private final Map<Tag, List<Tag>> childrenMap;
+    private final Tag root;
 
-    public TagTreeImpl(String nomeRadice) {
-        this.radice = new Tag(nomeRadice);
-        this.mappaPadri = new HashMap<>();
-        this.mappaFigli = new HashMap<>();
-        mappaFigli.put(radice, new ArrayList<>());
+    public TagTreeImpl(String rootName) {
+        this.root = new Tag(rootName);
+        this.parentMap = new HashMap<>();
+        this.childrenMap = new HashMap<>();
+        childrenMap.put(root, new ArrayList<>());
     }
 
     @Override
     public Tag getRoot() {
-        return radice;
+        return root;
     }
 
     @Override
     public Tag getParent(Tag tag) {
-        return mappaPadri.get(tag);
+        return parentMap.get(tag);
     }
 
     @Override
     public Collection<Tag> getChildren(Tag tag) {
-        if (mappaFigli.containsKey(tag)) {
-            return mappaFigli.get(tag);
-        } else {
-            return Collections.emptyList();
-        }
+        List<Tag> children = childrenMap.get(tag);
+        return children == null ? List.of() : Collections.unmodifiableList(children);
     }
 
     @Override
-    public void addSubTag(Tag padre, Tag figlio) {
-        if (!mappaFigli.containsKey(padre)) {
-            mappaFigli.put(padre, new ArrayList<>());
+    public void addSubTag(Tag parent, Tag child) {
+        Objects.requireNonNull(parent, "parent");
+        Objects.requireNonNull(child, "child");
+
+        childrenMap.computeIfAbsent(parent, k -> new ArrayList<>());
+
+        if (!childrenMap.get(parent).contains(child)) {
+            childrenMap.get(parent).add(child);
         }
-        mappaFigli.get(padre).add(figlio);
-        mappaPadri.put(figlio, padre);
-        if (!mappaFigli.containsKey(figlio)) {
-            mappaFigli.put(figlio, new ArrayList<>());
-        }
+
+        parentMap.putIfAbsent(child, parent);
+        childrenMap.computeIfAbsent(child, k -> new ArrayList<>());
     }
 
     @Override
     public Set<Tag> getAllSubTagsIncluding(Tag tag) {
-        Set<Tag> insieme = new HashSet<>();
-        aggiungiRicorsivamente(tag, insieme);
-        return insieme;
+        Set<Tag> result = new HashSet<>();
+        collectRecursively(tag, result);
+        return result;
     }
 
-    private void aggiungiRicorsivamente(Tag tagCorrente, Set<Tag> accumulo) {
-        accumulo.add(tagCorrente);
-        for (Tag figlio : getChildren(tagCorrente)) {
-            aggiungiRicorsivamente(figlio, accumulo);
+    private void collectRecursively(Tag current, Set<Tag> visited) {
+        if (visited.contains(current)) {
+            return;
+        }
+
+        visited.add(current);
+
+        for (Tag child : getChildren(current)) {
+            collectRecursively(child, visited);
         }
     }
 
     @Override
-    public Tag getOrCreateTag(String percorso) {
-        String[] sezioni = percorso.split(":");
-        Tag corrente = radice;
+    public Tag getOrCreateTag(String path) {
+        if (path == null || path.isBlank()) {
+            throw new IllegalArgumentException("Tag path vuoto");
+        }
 
-        for (String parte : sezioni) {
-            String nomePulito = parte.trim();
-            Tag successivo = new Tag(nomePulito);
-            boolean trovato = false;
+        String[] sections = path.split(":");
+        Tag current = root;
 
-            for (Tag figlio : getChildren(corrente)) {
-                if (figlio.equals(successivo)) {
-                    successivo = figlio;
-                    trovato = true;
+        for (String part : sections) {
+            String name = part.trim();
+            if (name.isEmpty()) {
+                continue;
+            }
+
+            Tag next = new Tag(name);
+
+            for (Tag child : getChildren(current)) {
+                if (child.equals(next)) {
+                    next = child;
                     break;
                 }
             }
 
-            if (!trovato) {
-                addSubTag(corrente, successivo);
+            if (!childrenMap.get(current).contains(next)) {
+                addSubTag(current, next);
             }
 
-            corrente = successivo;
+            current = next;
         }
 
-        return corrente;
+        return current;
     }
 }

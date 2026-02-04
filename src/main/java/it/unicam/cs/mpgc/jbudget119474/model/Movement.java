@@ -2,60 +2,73 @@ package it.unicam.cs.mpgc.jbudget119474.model;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class Movement {
 
-    private LocalDate data;
-    private String descrizione;
-    private double importo;
-    private List<Tag> listaTag;
+    private LocalDate date;
+    private String description;
+    private double amount;
+    private List<Tag> tags;
 
     public Movement() {
-        // Necessario per Jackson o deserializzazione
-        listaTag = new ArrayList<>();
+        this.tags = new ArrayList<>();
     }
 
-    public Movement(LocalDate data, String descrizione, double importo) {
-        this.data = data;
-        this.descrizione = descrizione;
-        this.importo = importo;
-        this.listaTag = new ArrayList<>();
+    public Movement(LocalDate date, String description, double amount) {
+        this.date = date;
+        this.description = description;
+
+        if (Double.isNaN(amount) || Double.isInfinite(amount)) {
+            throw new IllegalArgumentException("Invalid amount");
+        }
+
+        this.amount = amount;
+        this.tags = new ArrayList<>();
     }
 
-    public Movement(LocalDate data, String descrizione, double importo, List<Tag> tag) {
-        this.data = data;
-        this.descrizione = descrizione;
-        this.importo = importo;
-        this.listaTag = new ArrayList<>(tag);
+    public Movement(LocalDate date, String description, double amount, List<Tag> tags) {
+        this.date = date;
+        this.description = description;
+
+        if (Double.isNaN(amount) || Double.isInfinite(amount)) {
+            throw new IllegalArgumentException("Invalid amount");
+        }
+
+        this.amount = amount;
+        this.tags = new ArrayList<>(tags);
     }
 
-    public LocalDate getData() {
-        return data;
+    public LocalDate getDate() {
+        return date;
     }
 
-    public String getDescrizione() {
-        return descrizione;
+    public String getDescription() {
+        return description;
     }
 
-    public double getImporto() {
-        return importo;
+    public double getAmount() {
+        return amount;
     }
 
-    public List<Tag> getTag() {
-        return listaTag;
+    public List<Tag> getTags() {
+        return Collections.unmodifiableList(tags);
     }
 
-    public void aggiungiTag(Tag t) {
-        listaTag.add(t);
+    public void addTag(Tag tag) {
+        if (tag == null) {
+            throw new IllegalArgumentException("tag cannot be null");
+        }
+        tags.add(tag);
     }
 
-    public void clearTag() {
-        listaTag.clear();
+    public void clearTags() {
+        tags.clear();
     }
 
     @Override
     public String toString() {
-        return "Movimento del " + data + " - " + descrizione + ": " + importo + " €";
+        return "Movement on " + date + " - " + description + ": " + amount + " €";
     }
 }

@@ -1,22 +1,29 @@
 package it.unicam.cs.mpgc.jbudget119474.model;
 
-import java.time.LocalDate;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ScheduledMovement {
-    private Movement original;
+
+    private Movement baseMovement;
+
+    @JsonIgnore
     private RatePlan plan;
 
     public ScheduledMovement() {
     }
 
-    public ScheduledMovement(Movement movement, RatePlan plan) {
-        this.original = movement;
+    public ScheduledMovement(Movement baseMovement, RatePlan plan) {
+        this.baseMovement = baseMovement;
         this.plan = plan;
     }
 
-
-    public Movement getOriginal() {
-        return original;
+    public Movement getBaseMovement() {
+        return baseMovement;
     }
 
     public RatePlan getPlan() {
@@ -24,24 +31,47 @@ public class ScheduledMovement {
     }
 
     public LocalDate getDate() {
-        return original.getData();
+        if (baseMovement == null) {
+            return null;
+        }
+        return baseMovement.getDate();
     }
 
-    /**
-     * Ritorna una copia del movimento attuale (per essere registrato).
-     */
-    public Movement toMovement() {
-        return new Movement(original.getData(), original.getDescrizione(), original.getImporto(), original.getTag());
+    public Movement toConcreteMovement() {
+        if (baseMovement == null) {
+            return null;
+        }
+
+        return new Movement(
+                baseMovement.getDate(),
+                baseMovement.getDescription(),
+                baseMovement.getAmount(),
+                new ArrayList<>(baseMovement.getTags())
+        );
     }
 
-    /**
-     * Ritorna il prossimo movimento secondo il piano, oppure null se finito.
-     */
-    public ScheduledMovement next() {
-        LocalDate nextDate = plan.getProssimaData(original.getData());
-        if (nextDate == null) return null;
+    public ScheduledMovement nextOccurrence() {
 
-        Movement next = new Movement(nextDate, original.getDescrizione(), original.getImporto(), original.getTag());
+        if (baseMovement == null || plan == null) {
+            return null;
+        }
+
+        LocalDate nextDate =
+                plan.getNextDateAfter(
+                        baseMovement.getDate());
+
+        if (nextDate == null) {
+            return null;
+        }
+
+        Movement next =
+                new Movement(
+                        nextDate,
+                        baseMovement.getDescription(),
+                        baseMovement.getAmount(),
+                        new ArrayList<>(
+                                baseMovement.getTags()));
+
         return new ScheduledMovement(next, plan);
     }
 }

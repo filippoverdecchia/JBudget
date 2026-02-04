@@ -2,6 +2,7 @@ package it.unicam.cs.mpgc.jbudget119474.repository;
 
 import it.unicam.cs.mpgc.jbudget119474.model.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface MovementRepository {
@@ -13,5 +14,6 @@ public interface MovementRepository {
     double getTotalBalance();
     double getBalanceForTag(Tag tag, TagTree tree);
     void addScheduled(ScheduledMovement s);
+    void applyScheduledMovements(LocalDate today);
     List<ScheduledMovement> getScheduled();
 }

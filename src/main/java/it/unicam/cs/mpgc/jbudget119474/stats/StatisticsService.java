@@ -1,46 +1,49 @@
 package it.unicam.cs.mpgc.jbudget119474.stats;
 
-import it.unicam.cs.mpgc.jbudget119474.model.*;
+import it.unicam.cs.mpgc.jbudget119474.model.Movement;
 
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Servizio per calcolare statistiche sui movimenti.
- */
 public class StatisticsService {
 
-    private final List<Movement> listaMovimenti;
+    private final List<Movement> movements;
 
-    public StatisticsService(List<Movement> movimenti, TagTree tagTree) {
-        this.listaMovimenti = movimenti;
+    public StatisticsService(List<Movement> movements) {
+        this.movements = movements;
     }
 
-    /**
-     * Confronta la somma degli importi tra due intervalli temporali.
-     *
-     * @param inizio1 data di inizio periodo 1
-     * @param fine1   data di fine periodo 1
-     * @param inizio2 data di inizio periodo 2
-     * @param fine2   data di fine periodo 2
-     * @param tagTree albero dei tag (non usato in questa versione, ma presente)
-     * @return mappa con totali dei due periodi e differenza
-     */
-    public Map<String, Double> confrontaPeriodi(LocalDate inizio1, LocalDate fine1,
-                                                LocalDate inizio2, LocalDate fine2, TagTree tagTree) {
-        double totale1 = listaMovimenti.stream()
-                .filter(m -> !m.getData().isBefore(inizio1) && !m.getData().isAfter(fine1))
-                .mapToDouble(Movement::getImporto).sum();
+    public Map<String, Double> comparePeriods(
+            LocalDate start1, LocalDate end1,
+            LocalDate start2, LocalDate end2) {
 
-        double totale2 = listaMovimenti.stream()
-                .filter(m -> !m.getData().isBefore(inizio2) && !m.getData().isAfter(fine2))
-                .mapToDouble(Movement::getImporto).sum();
-        Map<String, Double> risultato = new HashMap<>();
-        risultato.put("Periodo 1", totale1);
-        risultato.put("Periodo 2", totale2);
-        risultato.put("Differenza", totale2 - totale1);
-        return risultato;
+        if (start1 == null || end1 == null || start2 == null || end2 == null) {
+            throw new IllegalArgumentException();
+        }
+
+        if (start1.isAfter(end1) || start2.isAfter(end2)) {
+            throw new IllegalArgumentException();
+        }
+
+        double total1 = movements.stream()
+                .filter(m -> !m.getDate().isBefore(start1)
+                        && !m.getDate().isAfter(end1))
+                .mapToDouble(Movement::getAmount)
+                .sum();
+
+        double total2 = movements.stream()
+                .filter(m -> !m.getDate().isBefore(start2)
+                        && !m.getDate().isAfter(end2))
+                .mapToDouble(Movement::getAmount)
+                .sum();
+
+        Map<String, Double> result = new HashMap<>();
+        result.put("Periodo 1", total1);
+        result.put("Periodo 2", total2);
+        result.put("Differenza", total2 - total1);
+
+        return result;
     }
 }

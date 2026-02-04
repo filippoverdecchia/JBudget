@@ -1,23 +1,30 @@
 package it.unicam.cs.mpgc.jbudget119474.model;
 
-import java.util.*;
+import java.util.Objects;
 
 public class Tag {
+
     private String name;
 
     public Tag() {
-        // Necessario per Jackson
+
     }
 
     public Tag(String name) {
-        this.name = name;
+        setName(name);
     }
 
     public String getName() {
         return name;
     }
 
-    // Per funzionare correttamente nelle Mappe
+    public void setName(String name) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("Tag name cannot be null or blank.");
+        }
+        this.name = name;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
